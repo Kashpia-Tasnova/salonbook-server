@@ -3,9 +3,15 @@ import { mongodbAdapter } from "better-auth/adapters/mongodb";
 import { getDB } from "../config/database.js";
 
 const authSecret = process.env.BETTER_AUTH_SECRET;
+const googleClientId = process.env.GOOGLE_CLIENT_ID;
+const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
 if (!authSecret) {
   throw new Error("BETTER_AUTH_SECRET is missing from environment variables");
+}
+
+if (!googleClientId || !googleClientSecret) {
+  throw new Error("Google OAuth credentials are missing from environment variables");
 }
 
 export const createAuth = () => {
@@ -23,6 +29,13 @@ export const createAuth = () => {
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 6,
+    },
+
+    socialProviders: {
+      google: {
+        clientId: googleClientId,
+        clientSecret: googleClientSecret,
+      },
     },
   });
 };
