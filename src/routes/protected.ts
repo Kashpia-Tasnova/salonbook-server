@@ -438,6 +438,65 @@ const createProtectedRoutes = (auth: AuthInstance) => {
     }
   );
 
+  // Delete (deactivate) a salon service (Admin only).
+  router.delete(
+    "/admin/services/:id",
+    requireAuth(auth),
+    requireRole("admin"),
+    async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        // Validate MongoDB ObjectId.
+        if (typeof id !== "string" || !ObjectId.isValid(id)) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid service ID.",
+          });
+        }
+
+        const servicesCollection = getDB().collection("services");
+
+        // Soft delete: keep the record but deactivate the service.
+        const result = await servicesCollection.findOneAndUpdate(
+          {
+            _id: new ObjectId(id),
+            isActive: true,
+          },
+          {
+            $set: {
+              isActive: false,
+              updatedAt: new Date(),
+            },
+          },
+          {
+            returnDocument: "after",
+          }
+        );
+
+        if (!result) {
+          return res.status(404).json({
+            success: false,
+            message: "Active salon service was not found.",
+          });
+        }
+
+        return res.status(200).json({
+          success: true,
+          message: "Service deactivated successfully.",
+          service: result,
+        });
+      } catch (error) {
+        console.error("Delete service error:", error);
+
+        return res.status(500).json({
+          success: false,
+          message: "Failed to delete service.",
+        });
+      }
+    }
+  );
+
   // Admin dashboard statistics API.
   router.get(
     "/admin/stats",
