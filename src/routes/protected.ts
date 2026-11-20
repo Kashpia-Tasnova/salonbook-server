@@ -942,6 +942,343 @@ const createProtectedRoutes = (auth: AuthInstance) => {
   );
 
 
+  // -------------------------------------------------------
+  // CUSTOMER APPOINTMENT BOOKING
+  // -------------------------------------------------------
+
+  const availableTimeSlots = [
+    "10:00 AM",
+    "11:00 AM",
+    "12:00 PM",
+    "01:00 PM",
+    "02:00 PM",
+    "03:00 PM",
+    "04:00 PM",
+    "05:00 PM",
+    "06:00 PM",
+  ];
+
+  // Create a new appointment (Customer only).
+  router.post(
+    "/appointments",
+    requireAuth(auth),
+    requireRole("customer"),
+    async (req, res) => {
+      try {
+        const session = res.locals.session;
+        const customerId = session.user.id;
+        const customerName = session.user.name;
+        const customerEmail = session.user.email;
+
+        const { serviceId, date, time, message } = req.body;
+
+        if (
+          typeof serviceId !== "string" ||
+          !ObjectId.isValid(serviceId)
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "Please select a valid salon service.",
+          });
+        }
+
+        if (
+          typeof date !== "string" ||
+          !/^\d{4}-\d{2}-\d{2}$/.test(date)
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "Please select a valid appointment date.",
+          });
+        }
+
+        const parsedDate = new Date(`${date}T00:00:00.000Z`);
+
+        if (
+          Number.isNaN(parsedDate.getTime()) ||
+          parsedDate.toISOString().slice(0, 10) !== date
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "The selected appointment date is invalid.",
+          });
+        }
+
+        const todayInDhaka = new Intl.DateTimeFormat("en-CA", {
+          timeZone: "Asia/Dhaka",
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+        }).format(new Date());
+
+        if (date < todayInDhaka) {
+          return res.status(400).json({
+            success: false,
+            message: "Please select today or a future date.",
+          });
+        }
+
+        if (
+          typeof time !== "string" ||
+          !availableTimeSlots.includes(time)
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "Please select an available appointment time.",
+          });
+        }
+
+        if (
+          message !== undefined &&
+          (typeof message !== "string" || message.trim().length > 500)
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "Your additional message cannot exceed 500 characters.",
+          });
+        }
+
+        const db = getDB();
+        const servicesCollection = db.collection("services");
+        const appointmentsCollection = db.collection("appointments");
+
+        const service = await servicesCollection.findOne({
+          _id: new ObjectId(serviceId),
+          isActive: true,
+        });
+
+        if (!service) {
+          return res.status(404).json({
+            success: false,
+            message: "This service is unavailable or no longer exists.",
+          });
+        }
+
+        // Ensure an active appointment can reserve each salon time slot.
+        await appointmentsCollection.createIndex(
+          { appointmentDate: 1, time: 1 },
+          {
+            unique: true,
+            partialFilterExpression: { isActiveBooking: true },
+            name: "unique_active_appointment_slot",
+          }
+        );
+
+        const existingAppointment = await appointmentsCollection.findOne({
+          appointmentDate: date,
+          time,
+          isActiveBooking: true,
+        });
+
+        if (existingAppointment) {
+          return res.status(409).json({
+            success: false,
+            message: "This time slot has already been booked. Please choose another time.",
+          });
+        }
+
+        const now = new Date();
+
+        const newAppointment = {
+          customerId,
+          customerName,
+          customerEmail,
+          serviceId: new ObjectId(serviceId),
+          serviceName: service.name,
+          serviceImage: service.image || "",
+          serviceCategory: service.category,
+          price: service.price,
+          duration: service.duration,
+          appointmentDate: date,
+          time,
+          message: message?.trim() || "",
+          status: "pending",
+          paymentStatus: "unpaid",
+          isActiveBooking: true,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        const result = await appointmentsCollection.insertOne(newAppointment);
+
+        return res.status(201).json({
+          success: true,
+          message: "Your appointment request has been submitted successfully.",
+          appointment: {
+            _id: result.insertedId,
+            ...newAppointment,
+          },
+        });
+      } catch (error) {
+        // MongoDB duplicate-key error: another request reserved this slot first.
+        if (
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          error.code === 11000
+        ) {
+          return res.status(409).json({
+            success: false,
+            message: "This time slot has already been booked. Please choose another time.",
+          });
+        }
+
+        console.error("Create appointment error:", error);
+
+        return res.status(500).json({
+          success: false,
+          message: "Failed to submit your appointment request.",
+        });
+      }
+    }
+  );
+
+  // Get the authenticated customer's appointments.
+  router.get(
+    "/customer/appointments",
+    requireAuth(auth),
+    requireRole("customer"),
+    async (req, res) => {
+      try {
+        const customerId = res.locals.session.user.id;
+
+        const appointments = await getDB()
+          .collection("appointments")
+          .find({ customerId })
+          .sort({ createdAt: -1 })
+          .toArray();
+
+        return res.status(200).json({
+          success: true,
+          total: appointments.length,
+          appointments,
+        });
+      } catch (error) {
+        console.error("Get customer appointments error:", error);
+
+        return res.status(500).json({
+          success: false,
+          message: "Failed to fetch your appointments.",
+        });
+      }
+    }
+  );
+
+  // Get one appointment belonging to the authenticated customer.
+  router.get(
+    "/customer/appointments/:id",
+    requireAuth(auth),
+    requireRole("customer"),
+    async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        if (typeof id !== "string" || !ObjectId.isValid(id)) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid appointment ID.",
+          });
+        }
+
+        const appointment = await getDB()
+          .collection("appointments")
+          .findOne({
+            _id: new ObjectId(id),
+            customerId: res.locals.session.user.id,
+          });
+
+        if (!appointment) {
+          return res.status(404).json({
+            success: false,
+            message: "Appointment not found.",
+          });
+        }
+
+        return res.status(200).json({
+          success: true,
+          appointment,
+        });
+      } catch (error) {
+        console.error("Get appointment details error:", error);
+
+        return res.status(500).json({
+          success: false,
+          message: "Failed to fetch appointment details.",
+        });
+      }
+    }
+  );
+
+  // Cancel a customer's own pending appointment.
+  router.patch(
+    "/customer/appointments/:id/cancel",
+    requireAuth(auth),
+    requireRole("customer"),
+    async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        if (typeof id !== "string" || !ObjectId.isValid(id)) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid appointment ID.",
+          });
+        }
+
+        const appointmentsCollection = getDB().collection("appointments");
+
+        const result = await appointmentsCollection.updateOne(
+          {
+            _id: new ObjectId(id),
+            customerId: res.locals.session.user.id,
+            status: "pending",
+            isActiveBooking: true,
+          },
+          {
+            $set: {
+              status: "cancelled",
+              isActiveBooking: false,
+              updatedAt: new Date(),
+            },
+          }
+        );
+
+        if (result.matchedCount === 0) {
+          const appointment = await appointmentsCollection.findOne({
+            _id: new ObjectId(id),
+            customerId: res.locals.session.user.id,
+          });
+
+          if (!appointment) {
+            return res.status(404).json({
+              success: false,
+              message: "Appointment not found.",
+            });
+          }
+
+          return res.status(409).json({
+            success: false,
+            message: "Only pending appointments can be cancelled.",
+          });
+        }
+
+        return res.status(200).json({
+          success: true,
+          message: "Your appointment has been cancelled successfully.",
+        });
+      } catch (error) {
+        console.error("Cancel appointment error:", error);
+
+        return res.status(500).json({
+          success: false,
+          message: "Failed to cancel your appointment.",
+        });
+      }
+    }
+  );
+
+
+
   // Admin dashboard statistics API.
   router.get(
     "/admin/stats",
