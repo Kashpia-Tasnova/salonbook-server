@@ -6,6 +6,7 @@ import { toNodeHandler } from "better-auth/node";
 import { connectDB } from "./config/database.js";
 import { createAuth } from "./lib/auth.js";
 import uploadRoutes from "./routes/upload.js";
+import createProtectedRoutes from "./routes/protected.js";
 
 const app = express();
 
@@ -30,13 +31,17 @@ const startServer = async () => {
     await connectDB();
 
     // Initialize Better Auth after MongoDB connects.
-    const auth = createAuth();
+   const auth = createAuth();
 
-    // Better Auth must receive requests before express.json().
-    app.all("/api/auth/*splat", toNodeHandler(auth));
+// Better Auth must receive requests before express.json().
+app.all("/api/auth/*splat", toNodeHandler(auth));
 
-    app.use(express.json());
-    app.use("/api/upload", uploadRoutes);
+app.use(express.json());
+
+app.use("/api/upload", uploadRoutes);
+
+// Protected test routes
+app.use("/api/protected", createProtectedRoutes(auth));
 
     app.listen(PORT, () => {
       console.log(`SalonBook server running on port ${PORT}`);
