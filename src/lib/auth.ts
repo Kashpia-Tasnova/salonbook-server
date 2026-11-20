@@ -1,3 +1,4 @@
+
 import { betterAuth } from "better-auth";
 import { mongodbAdapter } from "better-auth/adapters/mongodb";
 import { getDB } from "../config/database.js";
@@ -29,6 +30,19 @@ export const createAuth = () => {
     emailAndPassword: {
       enabled: true,
       minPasswordLength: 6,
+    },
+
+    // Every newly registered user is automatically a customer.
+    // Public signup cannot choose or modify their role.
+    user: {
+      additionalFields: {
+        role: {
+          type: "string",
+          required: false,
+          defaultValue: "customer",
+          input: false,
+        },
+      },
     },
 
     socialProviders: {
