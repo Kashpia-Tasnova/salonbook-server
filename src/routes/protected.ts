@@ -10,6 +10,73 @@ type AuthInstance = ReturnType<typeof createAuth>;
 const createProtectedRoutes = (auth: AuthInstance) => {
   const router = Router();
 
+
+  // Get all active salon services (Public).
+  router.get("/services", async (req, res) => {
+    try {
+      const servicesCollection = getDB().collection("services");
+
+      const services = await servicesCollection
+        .find({ isActive: true })
+        .sort({ createdAt: -1 })
+        .toArray();
+
+      return res.status(200).json({
+        success: true,
+        total: services.length,
+        services,
+      });
+    } catch (error) {
+      console.error("Get public services error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch services.",
+      });
+    }
+  });
+
+  // Get one active salon service by ID (Public).
+  router.get("/services/:id", async (req, res) => {
+    try {
+      const id = req.params.id;
+
+      if (typeof id !== "string" || !ObjectId.isValid(id)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid service ID.",
+        });
+      }
+
+      const service = await getDB()
+        .collection("services")
+        .findOne({
+          _id: new ObjectId(id),
+          isActive: true,
+        });
+
+      if (!service) {
+        return res.status(404).json({
+          success: false,
+          message: "Service not found.",
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        service,
+      });
+    } catch (error) {
+      console.error("Get public service details error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch service details.",
+      });
+    }
+  });
+
+
   // Get all salon services (Admin only).
   router.get(
     "/admin/services",
