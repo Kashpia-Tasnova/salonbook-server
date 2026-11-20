@@ -6,6 +6,8 @@ import type { createAuth } from "../lib/auth.js";
 
 type AuthInstance = ReturnType<typeof createAuth>;
 
+type ImageType = "profile" | "category" | "service";
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -16,11 +18,12 @@ const upload = multer({
       "image/jpeg",
       "image/png",
       "image/webp",
+      "image/avif",
     ];
 
     if (!allowedTypes.includes(file.mimetype)) {
       return callback(
-        new Error("Only JPG, PNG, and WEBP images are allowed.")
+        new Error("Only JPG, PNG, WEBP, and AVIF images are allowed.")
       );
     }
 
@@ -31,7 +34,7 @@ const upload = multer({
 const uploadImage = async (
   req: import("express").Request,
   res: import("express").Response,
-  imageType: "profile" | "category"
+  imageType: ImageType
 ) => {
   try {
     if (!req.file) {
@@ -71,13 +74,20 @@ const uploadImage = async (
 
       return res.status(502).json({
         success: false,
-        message: "Failed to upload image.",
+        message: "Failed to upload image. Please try another image.",
       });
     }
 
+    const imageTypeLabel =
+      imageType === "category"
+        ? "Category"
+        : imageType === "service"
+          ? "Service"
+          : "Profile";
+
     return res.status(200).json({
       success: true,
-      message: `${imageType === "category" ? "Category" : "Profile"} image uploaded successfully.`,
+      message: `${imageTypeLabel} image uploaded successfully.`,
       imageUrl: result.data.url,
     });
   } catch (error) {
@@ -93,7 +103,7 @@ const uploadImage = async (
 const createUploadRoutes = (auth: AuthInstance) => {
   const router = Router();
 
-  // Existing profile image upload
+  // Profile image upload
   router.post(
     "/profile-image",
     upload.single("image"),
@@ -110,6 +120,17 @@ const createUploadRoutes = (auth: AuthInstance) => {
     upload.single("image"),
     async (req, res) => {
       return uploadImage(req, res, "category");
+    }
+  );
+
+  // Admin-only service image upload
+  router.post(
+    "/service-image",
+    requireAuth(auth),
+    requireRole("admin"),
+    upload.single("image"),
+    async (req, res) => {
+      return uploadImage(req, res, "service");
     }
   );
 
