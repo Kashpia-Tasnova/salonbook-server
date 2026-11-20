@@ -5,7 +5,7 @@ import { toNodeHandler } from "better-auth/node";
 
 import { connectDB } from "./config/database.js";
 import { createAuth } from "./lib/auth.js";
-import uploadRoutes from "./routes/upload.js";
+import createUploadRoutes from "./routes/upload.js";
 import createProtectedRoutes from "./routes/protected.js";
 
 const app = express();
@@ -38,7 +38,7 @@ app.all("/api/auth/*splat", toNodeHandler(auth));
 
 app.use(express.json());
 
-app.use("/api/upload", uploadRoutes);
+app.use("/api/upload", createUploadRoutes(auth));
 
 // Protected test routes
 app.use("/api/protected", createProtectedRoutes(auth));

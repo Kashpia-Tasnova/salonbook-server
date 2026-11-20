@@ -531,6 +531,417 @@ const createProtectedRoutes = (auth: AuthInstance) => {
     }
   );
 
+
+  // Helper: Convert category names into URL-friendly slugs.
+  const createCategorySlug = (name: string) =>
+    name
+      .toLowerCase()
+      .trim()
+      .replace(/&/g, "and")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "");
+
+  // Get all active categories (Public).
+  router.get("/categories", async (req, res) => {
+    try {
+      const categories = await getDB()
+        .collection("categories")
+        .find({ isActive: true })
+        .sort({ name: 1 })
+        .toArray();
+
+      return res.status(200).json({
+        success: true,
+        total: categories.length,
+        categories,
+      });
+    } catch (error) {
+      console.error("Get public categories error:", error);
+
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch categories.",
+      });
+    }
+  });
+
+  // Get all categories (Admin only).
+  router.get(
+    "/admin/categories",
+    requireAuth(auth),
+    requireRole("admin"),
+    async (req, res) => {
+      try {
+        const categories = await getDB()
+          .collection("categories")
+          .find({})
+          .sort({ createdAt: -1 })
+          .toArray();
+
+        return res.status(200).json({
+          success: true,
+          total: categories.length,
+          categories,
+        });
+      } catch (error) {
+        console.error("Get admin categories error:", error);
+
+        return res.status(500).json({
+          success: false,
+          message: "Failed to fetch categories.",
+        });
+      }
+    }
+  );
+
+  // Create a category (Admin only).
+  router.post(
+    "/admin/categories",
+    requireAuth(auth),
+    requireRole("admin"),
+    async (req, res) => {
+      try {
+        const { name, description, image } = req.body;
+
+        if (
+          typeof name !== "string" ||
+          !name.trim() ||
+          name.trim().length > 100
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "Please provide a valid category name.",
+          });
+        }
+
+        if (
+          description !== undefined &&
+          (typeof description !== "string" ||
+            description.trim().length > 500)
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "Category description cannot exceed 500 characters.",
+          });
+        }
+
+        if (image !== undefined && image !== "") {
+          if (typeof image !== "string") {
+            return res.status(400).json({
+              success: false,
+              message: "Please provide a valid category image URL.",
+            });
+          }
+
+          try {
+            const imageUrl = new URL(image);
+
+            if (imageUrl.protocol !== "https:") {
+              throw new Error("Invalid image URL");
+            }
+          } catch {
+            return res.status(400).json({
+              success: false,
+              message: "Category image must be a valid HTTPS URL.",
+            });
+          }
+        }
+
+        const categoriesCollection = getDB().collection("categories");
+        const slug = createCategorySlug(name);
+
+        if (!slug) {
+          return res.status(400).json({
+            success: false,
+            message: "Please provide a valid category name.",
+          });
+        }
+
+        const existingCategory = await categoriesCollection.findOne({
+          slug,
+        });
+
+        if (existingCategory) {
+          return res.status(409).json({
+            success: false,
+            message: "A category with this name already exists.",
+          });
+        }
+
+        const now = new Date();
+
+        const newCategory = {
+          name: name.trim(),
+          slug,
+          description: description?.trim() || "",
+          image: image?.trim() || "",
+          isActive: true,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        const result = await categoriesCollection.insertOne(newCategory);
+
+        return res.status(201).json({
+          success: true,
+          message: "Category created successfully.",
+          category: {
+            _id: result.insertedId,
+            ...newCategory,
+          },
+        });
+      } catch (error) {
+        console.error("Create category error:", error);
+
+        return res.status(500).json({
+          success: false,
+          message: "Failed to create category.",
+        });
+      }
+    }
+  );
+
+  // Update a category (Admin only).
+  router.patch(
+    "/admin/categories/:id",
+    requireAuth(auth),
+    requireRole("admin"),
+    async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        if (typeof id !== "string" || !ObjectId.isValid(id)) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid category ID.",
+          });
+        }
+
+        const { name, description, image, isActive } = req.body;
+
+        const categoriesCollection = getDB().collection("categories");
+
+        const existingCategory = await categoriesCollection.findOne({
+          _id: new ObjectId(id),
+        });
+
+        if (!existingCategory) {
+          return res.status(404).json({
+            success: false,
+            message: "Category not found.",
+          });
+        }
+
+        const updates: {
+          name?: string;
+          slug?: string;
+          description?: string;
+          image?: string;
+          isActive?: boolean;
+          updatedAt?: Date;
+        } = {};
+
+        if (name !== undefined) {
+          if (
+            typeof name !== "string" ||
+            !name.trim() ||
+            name.trim().length > 100
+          ) {
+            return res.status(400).json({
+              success: false,
+              message: "Please provide a valid category name.",
+            });
+          }
+
+          const newSlug = createCategorySlug(name);
+
+          if (!newSlug) {
+            return res.status(400).json({
+              success: false,
+              message: "Please provide a valid category name.",
+            });
+          }
+
+          const duplicate = await categoriesCollection.findOne({
+            slug: newSlug,
+            _id: { $ne: new ObjectId(id) },
+          });
+
+          if (duplicate) {
+            return res.status(409).json({
+              success: false,
+              message: "Another category already uses this name.",
+            });
+          }
+
+          updates.name = name.trim();
+          updates.slug = newSlug;
+        }
+
+        if (description !== undefined) {
+          if (
+            typeof description !== "string" ||
+            description.trim().length > 500
+          ) {
+            return res.status(400).json({
+              success: false,
+              message: "Category description cannot exceed 500 characters.",
+            });
+          }
+
+          updates.description = description.trim();
+        }
+
+        if (image !== undefined) {
+          if (typeof image !== "string") {
+            return res.status(400).json({
+              success: false,
+              message: "Please provide a valid category image URL.",
+            });
+          }
+
+          if (image.trim()) {
+            try {
+              const imageUrl = new URL(image);
+
+              if (imageUrl.protocol !== "https:") {
+                throw new Error("Invalid image URL");
+              }
+            } catch {
+              return res.status(400).json({
+                success: false,
+                message: "Category image must be a valid HTTPS URL.",
+              });
+            }
+          }
+
+          updates.image = image.trim();
+        }
+
+        if (isActive !== undefined) {
+          if (typeof isActive !== "boolean") {
+            return res.status(400).json({
+              success: false,
+              message: "Category active status must be true or false.",
+            });
+          }
+
+          updates.isActive = isActive;
+        }
+
+        if (Object.keys(updates).length === 0) {
+          return res.status(400).json({
+            success: false,
+            message: "Please provide at least one field to update.",
+          });
+        }
+
+        updates.updatedAt = new Date();
+
+        await categoriesCollection.updateOne(
+          { _id: new ObjectId(id) },
+          { $set: updates }
+        );
+
+        // Keep existing services connected if the category name changes.
+        if (
+          updates.name &&
+          updates.name !== existingCategory.name
+        ) {
+          await getDB()
+            .collection("services")
+            .updateMany(
+              { category: existingCategory.name },
+              {
+                $set: {
+                  category: updates.name,
+                  updatedAt: new Date(),
+                },
+              }
+            );
+        }
+
+        const updatedCategory = await categoriesCollection.findOne({
+          _id: new ObjectId(id),
+        });
+
+        return res.status(200).json({
+          success: true,
+          message: "Category updated successfully.",
+          category: updatedCategory,
+        });
+      } catch (error) {
+        console.error("Update category error:", error);
+
+        return res.status(500).json({
+          success: false,
+          message: "Failed to update category.",
+        });
+      }
+    }
+  );
+
+  // Delete a category (Admin only).
+  router.delete(
+    "/admin/categories/:id",
+    requireAuth(auth),
+    requireRole("admin"),
+    async (req, res) => {
+      try {
+        const id = req.params.id;
+
+        if (typeof id !== "string" || !ObjectId.isValid(id)) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid category ID.",
+          });
+        }
+
+        const categoriesCollection = getDB().collection("categories");
+
+        const category = await categoriesCollection.findOne({
+          _id: new ObjectId(id),
+        });
+
+        if (!category) {
+          return res.status(404).json({
+            success: false,
+            message: "Category not found.",
+          });
+        }
+
+        const assignedServices = await getDB()
+          .collection("services")
+          .countDocuments({ category: category.name });
+
+        if (assignedServices > 0) {
+          return res.status(409).json({
+            success: false,
+            message:
+              "This category cannot be deleted because services are assigned to it. Reassign or delete those services first.",
+          });
+        }
+
+        await categoriesCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
+
+        return res.status(200).json({
+          success: true,
+          message: "Category deleted successfully.",
+        });
+      } catch (error) {
+        console.error("Delete category error:", error);
+
+        return res.status(500).json({
+          success: false,
+          message: "Failed to delete category.",
+        });
+      }
+    }
+  );
+
+
   // Admin dashboard statistics API.
   router.get(
     "/admin/stats",
