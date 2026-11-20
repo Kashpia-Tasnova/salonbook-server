@@ -58,7 +58,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           whatToExpect,
         } = req.body;
 
-        // Validate service name.
         if (
           typeof name !== "string" ||
           !name.trim() ||
@@ -70,7 +69,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           });
         }
 
-        // Validate category.
         if (typeof category !== "string" || !category.trim()) {
           return res.status(400).json({
             success: false,
@@ -78,7 +76,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           });
         }
 
-        // Validate short description.
         if (
           typeof shortDescription !== "string" ||
           !shortDescription.trim() ||
@@ -91,7 +88,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           });
         }
 
-        // Validate full description.
         if (
           typeof description !== "string" ||
           !description.trim() ||
@@ -103,7 +99,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           });
         }
 
-        // Validate service price.
         if (
           typeof price !== "number" ||
           !Number.isFinite(price) ||
@@ -115,7 +110,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           });
         }
 
-        // Validate service duration.
         if (!Number.isInteger(duration) || duration <= 0) {
           return res.status(400).json({
             success: false,
@@ -123,7 +117,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           });
         }
 
-        // Validate service image URL.
         if (typeof image !== "string" || !image.trim()) {
           return res.status(400).json({
             success: false,
@@ -144,7 +137,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           });
         }
 
-        // Validate What to Expect checklist.
         if (
           !Array.isArray(whatToExpect) ||
           whatToExpect.length === 0 ||
@@ -213,7 +205,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
       try {
         const id = req.params.id;
 
-        // Validate MongoDB ObjectId.
         if (typeof id !== "string" || !ObjectId.isValid(id)) {
           return res.status(400).json({
             success: false,
@@ -246,7 +237,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           updatedAt?: Date;
         } = {};
 
-        // Validate and update service name.
         if (name !== undefined) {
           if (
             typeof name !== "string" ||
@@ -262,7 +252,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           updates.name = name.trim();
         }
 
-        // Validate and update category.
         if (category !== undefined) {
           if (typeof category !== "string" || !category.trim()) {
             return res.status(400).json({
@@ -274,7 +263,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           updates.category = category.trim();
         }
 
-        // Validate and update short description.
         if (shortDescription !== undefined) {
           if (
             typeof shortDescription !== "string" ||
@@ -291,7 +279,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           updates.shortDescription = shortDescription.trim();
         }
 
-        // Validate and update full description.
         if (description !== undefined) {
           if (
             typeof description !== "string" ||
@@ -307,7 +294,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           updates.description = description.trim();
         }
 
-        // Validate and update image URL.
         if (image !== undefined) {
           if (typeof image !== "string" || !image.trim()) {
             return res.status(400).json({
@@ -332,7 +318,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           updates.image = image.trim();
         }
 
-        // Validate and update price.
         if (price !== undefined) {
           if (
             typeof price !== "number" ||
@@ -348,7 +333,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           updates.price = price;
         }
 
-        // Validate and update duration.
         if (duration !== undefined) {
           if (!Number.isInteger(duration) || duration <= 0) {
             return res.status(400).json({
@@ -360,7 +344,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           updates.duration = duration;
         }
 
-        // Validate and update What to Expect checklist.
         if (whatToExpect !== undefined) {
           if (
             !Array.isArray(whatToExpect) ||
@@ -385,7 +368,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           );
         }
 
-        // Validate and update active status.
         if (isActive !== undefined) {
           if (typeof isActive !== "boolean") {
             return res.status(400).json({
@@ -397,7 +379,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           updates.isActive = isActive;
         }
 
-        // Check whether at least one field was provided.
         if (Object.keys(updates).length === 0) {
           return res.status(400).json({
             success: false,
@@ -438,7 +419,7 @@ const createProtectedRoutes = (auth: AuthInstance) => {
     }
   );
 
-  // Delete (deactivate) a salon service (Admin only).
+  // Permanently delete a salon service (Admin only).
   router.delete(
     "/admin/services/:id",
     requireAuth(auth),
@@ -447,7 +428,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
       try {
         const id = req.params.id;
 
-        // Validate MongoDB ObjectId.
         if (typeof id !== "string" || !ObjectId.isValid(id)) {
           return res.status(400).json({
             success: false,
@@ -457,34 +437,21 @@ const createProtectedRoutes = (auth: AuthInstance) => {
 
         const servicesCollection = getDB().collection("services");
 
-        // Soft delete: keep the record but deactivate the service.
-        const result = await servicesCollection.findOneAndUpdate(
-          {
-            _id: new ObjectId(id),
-            isActive: true,
-          },
-          {
-            $set: {
-              isActive: false,
-              updatedAt: new Date(),
-            },
-          },
-          {
-            returnDocument: "after",
-          }
-        );
+        // Permanently remove the service from MongoDB.
+        const result = await servicesCollection.deleteOne({
+          _id: new ObjectId(id),
+        });
 
-        if (!result) {
+        if (result.deletedCount === 0) {
           return res.status(404).json({
             success: false,
-            message: "Active salon service was not found.",
+            message: "Service was not found.",
           });
         }
 
         return res.status(200).json({
           success: true,
-          message: "Service deactivated successfully.",
-          service: result,
+          message: "Service permanently deleted successfully.",
         });
       } catch (error) {
         console.error("Delete service error:", error);
