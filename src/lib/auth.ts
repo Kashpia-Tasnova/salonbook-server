@@ -32,15 +32,22 @@ export const createAuth = () => {
       minPasswordLength: 6,
     },
 
-    // Every newly registered user is automatically a customer.
-    // Public signup cannot choose or modify their role.
     user: {
       additionalFields: {
+        // Every newly registered user is automatically a customer.
+        // Public signup cannot choose or modify their role.
         role: {
           type: "string",
           required: false,
           defaultValue: "customer",
           input: false,
+        },
+
+        // Users can save and update their own phone number.
+        phone: {
+          type: "string",
+          required: false,
+          input: true,
         },
       },
     },
