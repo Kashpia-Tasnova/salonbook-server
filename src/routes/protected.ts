@@ -9,18 +9,60 @@ type AuthInstance = ReturnType<typeof createAuth>;
 const createProtectedRoutes = (auth: AuthInstance) => {
   const router = Router();
 
-  // Only administrators can access this endpoint.
+  
+  // Admin dashboard statistics API.
   router.get(
-    "/admin",
+    "/admin/stats",
     requireAuth(auth),
     requireRole("admin"),
-    (req, res) => {
-      res.status(200).json({
-        success: true,
-        message: "Admin access granted!",
-      });
+    async (req, res) => {
+      try {
+        const db = getDB();
+
+        const usersCollection = db.collection("user");
+        const servicesCollection = db.collection("services");
+        const appointmentsCollection = db.collection("appointments");
+        const transactionsCollection = db.collection("transactions");
+
+        const [
+          totalServices,
+          totalAppointments,
+          totalCustomers,
+          totalTransactions,
+          recentAppointments,
+        ] = await Promise.all([
+          servicesCollection.countDocuments(),
+          appointmentsCollection.countDocuments(),
+          usersCollection.countDocuments({ role: "customer" }),
+          transactionsCollection.countDocuments(),
+          appointmentsCollection
+            .find({})
+            .sort({ createdAt: -1 })
+            .limit(5)
+            .toArray(),
+        ]);
+
+        return res.status(200).json({
+          success: true,
+          stats: {
+            totalServices,
+            totalAppointments,
+            totalCustomers,
+            totalTransactions,
+          },
+          recentAppointments,
+        });
+      } catch (error) {
+        console.error("Admin statistics error:", error);
+
+        return res.status(500).json({
+          success: false,
+          message: "Failed to fetch admin dashboard statistics.",
+        });
+      }
     }
   );
+
 
   // Only customers can access this endpoint.
   router.get(
