@@ -1278,6 +1278,302 @@ const createProtectedRoutes = (auth: AuthInstance) => {
   );
 
 
+  // -------------------------------------------------------
+  // ADMIN APPOINTMENT MANAGEMENT
+  // -------------------------------------------------------
+
+  // Get all appointments (Admin only).
+  router.get(
+    "/admin/appointments",
+    requireAuth(auth),
+    requireRole("admin"),
+    async (req, res) => {
+      try {
+        const appointments = await getDB()
+          .collection("appointments")
+          .find({})
+          .sort({ createdAt: -1 })
+          .toArray();
+
+        return res.status(200).json({
+          success: true,
+          total: appointments.length,
+          appointments,
+        });
+      } catch (error) {
+        console.error("Get admin appointments error:", error);
+
+        return res.status(500).json({
+          success: false,
+          message: "Failed to fetch appointments.",
+        });
+      }
+    }
+  );
+
+  // Update appointment status (Admin only).
+  router.patch(
+    "/admin/appointments/:id/status",
+    requireAuth(auth),
+    requireRole("admin"),
+    async (req, res) => {
+      try {
+        const id = req.params.id;
+        const { status } = req.body;
+
+        if (typeof id !== "string" || !ObjectId.isValid(id)) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid appointment ID.",
+          });
+        }
+
+        const allowedStatuses = [
+          "confirmed",
+          "cancelled",
+          "completed",
+        ];
+
+        if (
+          typeof status !== "string" ||
+          !allowedStatuses.includes(status)
+        ) {
+          return res.status(400).json({
+            success: false,
+            message: "Please provide a valid appointment status.",
+          });
+        }
+
+        const appointmentsCollection =
+          getDB().collection("appointments");
+
+        const appointment = await appointmentsCollection.findOne({
+          _id: new ObjectId(id),
+        });
+
+        if (!appointment) {
+          return res.status(404).json({
+            success: false,
+            message: "Appointment not found.",
+          });
+        }
+
+        const currentStatus = appointment.status;
+
+        const validTransition =
+          (currentStatus === "pending" &&
+            ["confirmed", "cancelled"].includes(status)) ||
+          (currentStatus === "confirmed" &&
+            ["cancelled", "completed"].includes(status));
+
+        if (!validTransition) {
+          return res.status(409).json({
+            success: false,
+            message: `Cannot change appointment from ${currentStatus} to ${status}.`,
+          });
+        }
+
+        const result = await appointmentsCollection.updateOne(
+          {
+            _id: new ObjectId(id),
+            status: currentStatus,
+          },
+          {
+            $set: {
+              status,
+              isActiveBooking: status === "confirmed",
+              updatedAt: new Date(),
+            },
+          }
+        );
+
+        if (result.matchedCount === 0) {
+          return res.status(409).json({
+            success: false,
+            message: "This appointment was already updated. Please refresh.",
+          });
+        }
+
+        const updatedAppointment =
+          await appointmentsCollection.findOne({
+            _id: new ObjectId(id),
+          });
+
+        return res.status(200).json({
+          success: true,
+          message: `Appointment ${status} successfully.`,
+          appointment: updatedAppointment,
+        });
+      } catch (error) {
+        console.error("Update admin appointment error:", error);
+
+        return res.status(500).json({
+          success: false,
+          message: "Failed to update appointment status.",
+        });
+      }
+    }
+  );
+
+
+
+  // Admin: Get all registered users.
+  router.get(
+    "/admin/users",
+    requireAuth(auth),
+    requireRole("admin"),
+    async (req, res) => {
+      try {
+        const usersCollection = getDB().collection("user");
+
+        const users = await usersCollection
+          .find(
+            {},
+            {
+              projection: {
+                name: 1,
+                email: 1,
+                image: 1,
+                role: 1,
+                phone: 1,
+                isBlocked: 1,
+                createdAt: 1,
+              },
+            }
+          )
+          .sort({ createdAt: -1 })
+          .toArray();
+
+        return res.status(200).json({
+          success: true,
+          total: users.length,
+          users: users.map((user) => ({
+            _id: user._id.toString(),
+            name: user.name || "Unknown User",
+            email: user.email,
+            image: user.image || "",
+            role: user.role || "customer",
+            phone: user.phone || "",
+            isBlocked: user.isBlocked === true,
+            createdAt: user.createdAt || null,
+          })),
+        });
+      } catch (error) {
+        console.error("Get admin users error:", error);
+
+        return res.status(500).json({
+          success: false,
+          message: "Failed to fetch users.",
+        });
+      }
+    }
+  );
+
+  // Admin: Block or unblock a customer account.
+  router.patch(
+    "/admin/users/:id/status",
+    requireAuth(auth),
+    requireRole("admin"),
+    async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { isBlocked } = req.body;
+
+        if (typeof id !== "string" || !ObjectId.isValid(id)) {
+          return res.status(400).json({
+            success: false,
+            message: "Invalid user ID.",
+          });
+        }
+
+        if (typeof isBlocked !== "boolean") {
+          return res.status(400).json({
+            success: false,
+            message: "isBlocked must be true or false.",
+          });
+        }
+
+        const usersCollection = getDB().collection("user");
+
+        const targetUser = await usersCollection.findOne({
+          _id: new ObjectId(id),
+        });
+
+        if (!targetUser) {
+          return res.status(404).json({
+            success: false,
+            message: "User not found.",
+          });
+        }
+
+        const currentAdminEmail = res.locals.session.user.email;
+
+        // Admins cannot block or unblock other administrator accounts.
+        if (targetUser.role === "admin") {
+          return res.status(403).json({
+            success: false,
+            message: "Administrator accounts cannot be modified here.",
+          });
+        }
+
+        // Prevent an administrator from modifying their own account.
+        if (targetUser.email === currentAdminEmail) {
+          return res.status(403).json({
+            success: false,
+            message: "You cannot modify your own account.",
+          });
+        }
+
+        await usersCollection.updateOne(
+          { _id: new ObjectId(id) },
+          {
+            $set: {
+              isBlocked,
+              updatedAt: new Date(),
+            },
+          }
+        );
+
+        const updatedUser = await usersCollection.findOne(
+          { _id: new ObjectId(id) },
+          {
+            projection: {
+              name: 1,
+              email: 1,
+              image: 1,
+              role: 1,
+              isBlocked: 1,
+            },
+          }
+        );
+
+        return res.status(200).json({
+          success: true,
+          message: isBlocked
+            ? "User blocked successfully."
+            : "User unblocked successfully.",
+          user: updatedUser
+            ? {
+                _id: updatedUser._id.toString(),
+                name: updatedUser.name || "Unknown User",
+                email: updatedUser.email,
+                image: updatedUser.image || "",
+                role: updatedUser.role || "customer",
+                isBlocked: updatedUser.isBlocked === true,
+              }
+            : null,
+        });
+      } catch (error) {
+        console.error("Update user block status error:", error);
+
+        return res.status(500).json({
+          success: false,
+          message: "Failed to update user status.",
+        });
+      }
+    }
+  );
+
 
   // Admin dashboard statistics API.
   router.get(

@@ -2,6 +2,7 @@
 import type { RequestHandler } from "express";
 import { fromNodeHeaders } from "better-auth/node";
 import type { createAuth } from "../lib/auth.js";
+import { getDB } from "../config/database.js";
 
 type AuthInstance = ReturnType<typeof createAuth>;
 
@@ -16,6 +17,21 @@ export const requireAuth = (auth: AuthInstance): RequestHandler => {
         return res.status(401).json({
           success: false,
           message: "Please sign in to access this resource.",
+        });
+      }
+
+      // Check whether the authenticated account is blocked.
+      const user = await getDB().collection("user").findOne(
+        { email: session.user.email },
+        { projection: { isBlocked: 1 } }
+      );
+
+      if (user?.isBlocked === true) {
+        return res.status(403).json({
+          success: false,
+          blocked: true,
+          message:
+            "Your account has been blocked. Please contact the administrator.",
         });
       }
 

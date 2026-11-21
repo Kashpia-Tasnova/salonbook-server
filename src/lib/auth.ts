@@ -12,7 +12,9 @@ if (!authSecret) {
 }
 
 if (!googleClientId || !googleClientSecret) {
-  throw new Error("Google OAuth credentials are missing from environment variables");
+  throw new Error(
+    "Google OAuth credentials are missing from environment variables"
+  );
 }
 
 export const createAuth = () => {
@@ -40,6 +42,15 @@ export const createAuth = () => {
           type: "string",
           required: false,
           defaultValue: "customer",
+          input: false,
+        },
+
+        // Blocking status is controlled only by administrators.
+        // Public signup cannot set or modify this field.
+        isBlocked: {
+          type: "boolean",
+          required: false,
+          defaultValue: false,
           input: false,
         },
 
