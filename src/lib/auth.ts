@@ -7,6 +7,8 @@ const authSecret = process.env.BETTER_AUTH_SECRET;
 const googleClientId = process.env.GOOGLE_CLIENT_ID;
 const googleClientSecret = process.env.GOOGLE_CLIENT_SECRET;
 
+const isProduction = process.env.NODE_ENV === "production";
+
 if (!authSecret) {
   throw new Error("BETTER_AUTH_SECRET is missing from environment variables");
 }
@@ -26,8 +28,17 @@ export const createAuth = () => {
     baseURL: process.env.BETTER_AUTH_URL || "http://localhost:5000",
 
     trustedOrigins: [
-      process.env.CLIENT_URL || "http://localhost:3000",
+      "http://localhost:3000",
+      process.env.CLIENT_URL || "https://salonbook-client-six-zeta.vercel.app",
     ],
+
+    advanced: {
+      defaultCookieAttributes: {
+        sameSite: isProduction ? "none" : "lax",
+        secure: isProduction,
+        httpOnly: true,
+      },
+    },
 
     emailAndPassword: {
       enabled: true,
