@@ -6,6 +6,11 @@
 
 The backend provides REST APIs for the frontend and uses MongoDB to store application data.
 
+## Live Deployment Links
+
+- **Live Website (Frontend):** https://salonbook-client-six-zeta.vercel.app/
+- **Live Backend API:** https://salonbook-server-ydpb.onrender.com
+
 ## Important Features
 
 ### Authentication and Authorization
@@ -90,6 +95,7 @@ Add the following environment variable names:
 ```env
 PORT=
 MONGODB_URI=
+DB_NAME=
 BETTER_AUTH_SECRET=
 BETTER_AUTH_URL=
 CLIENT_URL=
@@ -97,11 +103,12 @@ CLIENT_URL=
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=
 
-GITHUB_CLIENT_ID=
-GITHUB_CLIENT_SECRET=
-
 STRIPE_SECRET_KEY=
 STRIPE_WEBHOOK_SECRET=
+
+ADMIN_EMAIL=
+ADMIN_PASSWORD=
+ADMIN_NAME=
 ```
 
 Provide the appropriate values for your local configuration. Do not commit `.env` files or actual secret values to GitHub.
@@ -132,29 +139,25 @@ npm start
 |---|---|
 | `PORT` | Backend server port |
 | `MONGODB_URI` | MongoDB connection string |
+| `DB_NAME` | MongoDB database name |
 | `BETTER_AUTH_SECRET` | Secret used by Better Auth |
 | `BETTER_AUTH_URL` | Backend authentication URL |
 | `CLIENT_URL` | Frontend application URL |
 | `GOOGLE_CLIENT_ID` | Google OAuth client ID |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret |
-| `GITHUB_CLIENT_ID` | GitHub OAuth client ID |
-| `GITHUB_CLIENT_SECRET` | GitHub OAuth client secret |
 | `STRIPE_SECRET_KEY` | Stripe API secret key |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook signing secret |
+| `ADMIN_EMAIL` | Initial admin email address |
+| `ADMIN_PASSWORD` | Initial admin password |
+| `ADMIN_NAME` | Initial admin display name |
 
 **Note:** Environment variable names are documented here without their actual values. Keep all credentials and secret keys private.
 
-## Live Website Link
-
-**Live Website:** [Add your deployed frontend URL here]
-
 ## Client and Server Repository Links
 
-- **Client Repository:** [https://github.com/Kashpia-Tasnova/salonbook-client](https://github.com/Kashpia-Tasnova/salonbook-client)
-- **Server Repository:** [https://github.com/Kashpia-Tasnova/salonbook-server](https://github.com/Kashpia-Tasnova/salonbook-server)
+- **Client Repository:** https://github.com/Kashpia-Tasnova/salonbook-client
+- **Server Repository:** https://github.com/Kashpia-Tasnova/salonbook-server
 
 ## Author
 
 **SalonBook – Blush & Bloom**
-
-Assignment 9 – Category 002
