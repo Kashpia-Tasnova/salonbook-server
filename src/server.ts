@@ -12,6 +12,7 @@ import { stripe } from "./lib/stripe.js";
 import createUploadRoutes from "./routes/upload.js";
 import createProtectedRoutes from "./routes/protected.js";
 import createPaymentRoutes from "./routes/payment.js";
+import createTransactionRoutes from "./routes/transactions.js";
 
 const app = express();
 
@@ -72,10 +73,10 @@ const cleanupOrphanedGoogleAccounts = async () => {
   }
 };
 
-// Start Express server
+// Start Express server.
 const startServer = async () => {
   try {
-    // Connect MongoDB
+    // Connect MongoDB.
     await connectDB();
 
     // Prevent duplicate transaction records for the same Stripe session.
@@ -242,6 +243,12 @@ const startServer = async () => {
 
     // Register payment routes.
     app.use("/api/payment", createPaymentRoutes(auth));
+
+    // Register transaction routes (Admin only).
+    app.use(
+      "/api/admin/transactions",
+      createTransactionRoutes(auth)
+    );
 
     // Register upload routes.
     app.use("/api/upload", createUploadRoutes(auth));
