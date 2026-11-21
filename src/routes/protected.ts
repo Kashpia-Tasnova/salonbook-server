@@ -10,13 +10,11 @@ type AuthInstance = ReturnType<typeof createAuth>;
 const createProtectedRoutes = (auth: AuthInstance) => {
   const router = Router();
 
-
   // Get all active salon services (Public).
   router.get("/services", async (req, res) => {
     try {
-      const servicesCollection = getDB().collection("services");
-
-      const services = await servicesCollection
+      const services = await getDB()
+        .collection("services")
         .find({ isActive: true })
         .sort({ createdAt: -1 })
         .toArray();
@@ -28,7 +26,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
       });
     } catch (error) {
       console.error("Get public services error:", error);
-
       return res.status(500).json({
         success: false,
         message: "Failed to fetch services.",
@@ -68,14 +65,12 @@ const createProtectedRoutes = (auth: AuthInstance) => {
       });
     } catch (error) {
       console.error("Get public service details error:", error);
-
       return res.status(500).json({
         success: false,
         message: "Failed to fetch service details.",
       });
     }
   });
-
 
   // Get all salon services (Admin only).
   router.get(
@@ -84,9 +79,8 @@ const createProtectedRoutes = (auth: AuthInstance) => {
     requireRole("admin"),
     async (req, res) => {
       try {
-        const servicesCollection = getDB().collection("services");
-
-        const services = await servicesCollection
+        const services = await getDB()
+          .collection("services")
           .find({})
           .sort({ createdAt: -1 })
           .toArray();
@@ -98,7 +92,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         });
       } catch (error) {
         console.error("Get admin services error:", error);
-
         return res.status(500).json({
           success: false,
           message: "Failed to fetch services.",
@@ -150,8 +143,7 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         ) {
           return res.status(400).json({
             success: false,
-            message:
-              "Please provide a short description (maximum 250 characters).",
+            message: "Please provide a short description (maximum 250 characters).",
           });
         }
 
@@ -193,7 +185,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
 
         try {
           const imageUrl = new URL(image);
-
           if (imageUrl.protocol !== "https:") {
             throw new Error("Invalid image URL");
           }
@@ -217,8 +208,7 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         ) {
           return res.status(400).json({
             success: false,
-            message:
-              "Provide between 1 and 10 valid What to Expect points.",
+            message: "Provide between 1 and 10 valid What to Expect points.",
           });
         }
 
@@ -232,17 +222,15 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           image: image.trim(),
           price,
           duration,
-          whatToExpect: whatToExpect.map(
-            (item: string) => item.trim()
-          ),
+          whatToExpect: whatToExpect.map((item: string) => item.trim()),
           isActive: true,
           createdAt: now,
           updatedAt: now,
         };
 
-        const servicesCollection = getDB().collection("services");
-
-        const result = await servicesCollection.insertOne(newService);
+        const result = await getDB()
+          .collection("services")
+          .insertOne(newService);
 
         return res.status(201).json({
           success: true,
@@ -254,7 +242,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         });
       } catch (error) {
         console.error("Create service error:", error);
-
         return res.status(500).json({
           success: false,
           message: "Failed to create service.",
@@ -305,17 +292,12 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         } = {};
 
         if (name !== undefined) {
-          if (
-            typeof name !== "string" ||
-            !name.trim() ||
-            name.trim().length > 100
-          ) {
+          if (typeof name !== "string" || !name.trim() || name.trim().length > 100) {
             return res.status(400).json({
               success: false,
               message: "Please provide a valid service name.",
             });
           }
-
           updates.name = name.trim();
         }
 
@@ -326,7 +308,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
               message: "Please provide a valid service category.",
             });
           }
-
           updates.category = category.trim();
         }
 
@@ -338,11 +319,9 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           ) {
             return res.status(400).json({
               success: false,
-              message:
-                "Short description must be between 1 and 250 characters.",
+              message: "Short description must be between 1 and 250 characters.",
             });
           }
-
           updates.shortDescription = shortDescription.trim();
         }
 
@@ -357,7 +336,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
               message: "Please provide a valid full description.",
             });
           }
-
           updates.description = description.trim();
         }
 
@@ -371,7 +349,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
 
           try {
             const imageUrl = new URL(image);
-
             if (imageUrl.protocol !== "https:") {
               throw new Error("Invalid image URL");
             }
@@ -396,7 +373,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
               message: "Please provide a valid service price.",
             });
           }
-
           updates.price = price;
         }
 
@@ -407,7 +383,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
               message: "Please provide a valid duration in minutes.",
             });
           }
-
           updates.duration = duration;
         }
 
@@ -425,14 +400,10 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           ) {
             return res.status(400).json({
               success: false,
-              message:
-                "Provide between 1 and 10 valid What to Expect points.",
+              message: "Provide between 1 and 10 valid What to Expect points.",
             });
           }
-
-          updates.whatToExpect = whatToExpect.map(
-            (item: string) => item.trim()
-          );
+          updates.whatToExpect = whatToExpect.map((item: string) => item.trim());
         }
 
         if (isActive !== undefined) {
@@ -442,7 +413,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
               message: "Service active status must be true or false.",
             });
           }
-
           updates.isActive = isActive;
         }
 
@@ -455,13 +425,13 @@ const createProtectedRoutes = (auth: AuthInstance) => {
 
         updates.updatedAt = new Date();
 
-        const servicesCollection = getDB().collection("services");
-
-        const result = await servicesCollection.findOneAndUpdate(
-          { _id: new ObjectId(id) },
-          { $set: updates },
-          { returnDocument: "after" }
-        );
+        const result = await getDB()
+          .collection("services")
+          .findOneAndUpdate(
+            { _id: new ObjectId(id) },
+            { $set: updates },
+            { returnDocument: "after" }
+          );
 
         if (!result) {
           return res.status(404).json({
@@ -477,7 +447,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         });
       } catch (error) {
         console.error("Update service error:", error);
-
         return res.status(500).json({
           success: false,
           message: "Failed to update service.",
@@ -502,12 +471,9 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           });
         }
 
-        const servicesCollection = getDB().collection("services");
-
-        // Permanently remove the service from MongoDB.
-        const result = await servicesCollection.deleteOne({
-          _id: new ObjectId(id),
-        });
+        const result = await getDB()
+          .collection("services")
+          .deleteOne({ _id: new ObjectId(id) });
 
         if (result.deletedCount === 0) {
           return res.status(404).json({
@@ -522,7 +488,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         });
       } catch (error) {
         console.error("Delete service error:", error);
-
         return res.status(500).json({
           success: false,
           message: "Failed to delete service.",
@@ -530,7 +495,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
       }
     }
   );
-
 
   // Helper: Convert category names into URL-friendly slugs.
   const createCategorySlug = (name: string) =>
@@ -557,7 +521,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
       });
     } catch (error) {
       console.error("Get public categories error:", error);
-
       return res.status(500).json({
         success: false,
         message: "Failed to fetch categories.",
@@ -585,7 +548,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         });
       } catch (error) {
         console.error("Get admin categories error:", error);
-
         return res.status(500).json({
           success: false,
           message: "Failed to fetch categories.",
@@ -603,11 +565,7 @@ const createProtectedRoutes = (auth: AuthInstance) => {
       try {
         const { name, description, image } = req.body;
 
-        if (
-          typeof name !== "string" ||
-          !name.trim() ||
-          name.trim().length > 100
-        ) {
+        if (typeof name !== "string" || !name.trim() || name.trim().length > 100) {
           return res.status(400).json({
             success: false,
             message: "Please provide a valid category name.",
@@ -616,8 +574,7 @@ const createProtectedRoutes = (auth: AuthInstance) => {
 
         if (
           description !== undefined &&
-          (typeof description !== "string" ||
-            description.trim().length > 500)
+          (typeof description !== "string" || description.trim().length > 500)
         ) {
           return res.status(400).json({
             success: false,
@@ -635,7 +592,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
 
           try {
             const imageUrl = new URL(image);
-
             if (imageUrl.protocol !== "https:") {
               throw new Error("Invalid image URL");
             }
@@ -657,9 +613,7 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           });
         }
 
-        const existingCategory = await categoriesCollection.findOne({
-          slug,
-        });
+        const existingCategory = await categoriesCollection.findOne({ slug });
 
         if (existingCategory) {
           return res.status(409).json({
@@ -692,7 +646,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         });
       } catch (error) {
         console.error("Create category error:", error);
-
         return res.status(500).json({
           success: false,
           message: "Failed to create category.",
@@ -718,7 +671,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         }
 
         const { name, description, image, isActive } = req.body;
-
         const categoriesCollection = getDB().collection("categories");
 
         const existingCategory = await categoriesCollection.findOne({
@@ -742,11 +694,7 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         } = {};
 
         if (name !== undefined) {
-          if (
-            typeof name !== "string" ||
-            !name.trim() ||
-            name.trim().length > 100
-          ) {
+          if (typeof name !== "string" || !name.trim() || name.trim().length > 100) {
             return res.status(400).json({
               success: false,
               message: "Please provide a valid category name.",
@@ -779,16 +727,12 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         }
 
         if (description !== undefined) {
-          if (
-            typeof description !== "string" ||
-            description.trim().length > 500
-          ) {
+          if (typeof description !== "string" || description.trim().length > 500) {
             return res.status(400).json({
               success: false,
               message: "Category description cannot exceed 500 characters.",
             });
           }
-
           updates.description = description.trim();
         }
 
@@ -803,7 +747,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           if (image.trim()) {
             try {
               const imageUrl = new URL(image);
-
               if (imageUrl.protocol !== "https:") {
                 throw new Error("Invalid image URL");
               }
@@ -825,7 +768,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
               message: "Category active status must be true or false.",
             });
           }
-
           updates.isActive = isActive;
         }
 
@@ -844,10 +786,7 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         );
 
         // Keep existing services connected if the category name changes.
-        if (
-          updates.name &&
-          updates.name !== existingCategory.name
-        ) {
+        if (updates.name && updates.name !== existingCategory.name) {
           await getDB()
             .collection("services")
             .updateMany(
@@ -872,7 +811,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         });
       } catch (error) {
         console.error("Update category error:", error);
-
         return res.status(500).json({
           success: false,
           message: "Failed to update category.",
@@ -898,7 +836,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         }
 
         const categoriesCollection = getDB().collection("categories");
-
         const category = await categoriesCollection.findOne({
           _id: new ObjectId(id),
         });
@@ -917,8 +854,7 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         if (assignedServices > 0) {
           return res.status(409).json({
             success: false,
-            message:
-              "This category cannot be deleted because services are assigned to it. Reassign or delete those services first.",
+            message: "This category cannot be deleted because services are assigned to it. Reassign or delete those services first.",
           });
         }
 
@@ -932,7 +868,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         });
       } catch (error) {
         console.error("Delete category error:", error);
-
         return res.status(500).json({
           success: false,
           message: "Failed to delete category.",
@@ -940,7 +875,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
       }
     }
   );
-
 
   // -------------------------------------------------------
   // CUSTOMER APPOINTMENT BOOKING
@@ -972,20 +906,14 @@ const createProtectedRoutes = (auth: AuthInstance) => {
 
         const { serviceId, date, time, message } = req.body;
 
-        if (
-          typeof serviceId !== "string" ||
-          !ObjectId.isValid(serviceId)
-        ) {
+        if (typeof serviceId !== "string" || !ObjectId.isValid(serviceId)) {
           return res.status(400).json({
             success: false,
             message: "Please select a valid salon service.",
           });
         }
 
-        if (
-          typeof date !== "string" ||
-          !/^\d{4}-\d{2}-\d{2}$/.test(date)
-        ) {
+        if (typeof date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
           return res.status(400).json({
             success: false,
             message: "Please select a valid appointment date.",
@@ -1018,10 +946,7 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           });
         }
 
-        if (
-          typeof time !== "string" ||
-          !availableTimeSlots.includes(time)
-        ) {
+        if (typeof time !== "string" || !availableTimeSlots.includes(time)) {
           return res.status(400).json({
             success: false,
             message: "Please select an available appointment time.",
@@ -1054,7 +979,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           });
         }
 
-        // Ensure an active appointment can reserve each salon time slot.
         await appointmentsCollection.createIndex(
           { appointmentDate: 1, time: 1 },
           {
@@ -1110,7 +1034,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           },
         });
       } catch (error) {
-        // MongoDB duplicate-key error: another request reserved this slot first.
         if (
           typeof error === "object" &&
           error !== null &&
@@ -1124,7 +1047,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         }
 
         console.error("Create appointment error:", error);
-
         return res.status(500).json({
           success: false,
           message: "Failed to submit your appointment request.",
@@ -1140,11 +1062,9 @@ const createProtectedRoutes = (auth: AuthInstance) => {
     requireRole("customer"),
     async (req, res) => {
       try {
-        const customerId = res.locals.session.user.id;
-
         const appointments = await getDB()
           .collection("appointments")
-          .find({ customerId })
+          .find({ customerId: res.locals.session.user.id })
           .sort({ createdAt: -1 })
           .toArray();
 
@@ -1155,7 +1075,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         });
       } catch (error) {
         console.error("Get customer appointments error:", error);
-
         return res.status(500).json({
           success: false,
           message: "Failed to fetch your appointments.",
@@ -1200,7 +1119,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         });
       } catch (error) {
         console.error("Get appointment details error:", error);
-
         return res.status(500).json({
           success: false,
           message: "Failed to fetch appointment details.",
@@ -1268,7 +1186,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         });
       } catch (error) {
         console.error("Cancel appointment error:", error);
-
         return res.status(500).json({
           success: false,
           message: "Failed to cancel your appointment.",
@@ -1276,7 +1193,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
       }
     }
   );
-
 
   // -------------------------------------------------------
   // ADMIN APPOINTMENT MANAGEMENT
@@ -1302,7 +1218,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         });
       } catch (error) {
         console.error("Get admin appointments error:", error);
-
         return res.status(500).json({
           success: false,
           message: "Failed to fetch appointments.",
@@ -1328,24 +1243,16 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           });
         }
 
-        const allowedStatuses = [
-          "confirmed",
-          "cancelled",
-          "completed",
-        ];
+        const allowedStatuses = ["confirmed", "cancelled", "completed"];
 
-        if (
-          typeof status !== "string" ||
-          !allowedStatuses.includes(status)
-        ) {
+        if (typeof status !== "string" || !allowedStatuses.includes(status)) {
           return res.status(400).json({
             success: false,
             message: "Please provide a valid appointment status.",
           });
         }
 
-        const appointmentsCollection =
-          getDB().collection("appointments");
+        const appointmentsCollection = getDB().collection("appointments");
 
         const appointment = await appointmentsCollection.findOne({
           _id: new ObjectId(id),
@@ -1394,10 +1301,9 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           });
         }
 
-        const updatedAppointment =
-          await appointmentsCollection.findOne({
-            _id: new ObjectId(id),
-          });
+        const updatedAppointment = await appointmentsCollection.findOne({
+          _id: new ObjectId(id),
+        });
 
         return res.status(200).json({
           success: true,
@@ -1406,7 +1312,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         });
       } catch (error) {
         console.error("Update admin appointment error:", error);
-
         return res.status(500).json({
           success: false,
           message: "Failed to update appointment status.",
@@ -1415,8 +1320,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
     }
   );
 
-
-
   // Admin: Get all registered users.
   router.get(
     "/admin/users",
@@ -1424,9 +1327,8 @@ const createProtectedRoutes = (auth: AuthInstance) => {
     requireRole("admin"),
     async (req, res) => {
       try {
-        const usersCollection = getDB().collection("user");
-
-        const users = await usersCollection
+        const users = await getDB()
+          .collection("user")
           .find(
             {},
             {
@@ -1460,7 +1362,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         });
       } catch (error) {
         console.error("Get admin users error:", error);
-
         return res.status(500).json({
           success: false,
           message: "Failed to fetch users.",
@@ -1494,7 +1395,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         }
 
         const usersCollection = getDB().collection("user");
-
         const targetUser = await usersCollection.findOne({
           _id: new ObjectId(id),
         });
@@ -1508,7 +1408,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
 
         const currentAdminEmail = res.locals.session.user.email;
 
-        // Admins cannot block or unblock other administrator accounts.
         if (targetUser.role === "admin") {
           return res.status(403).json({
             success: false,
@@ -1516,7 +1415,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           });
         }
 
-        // Prevent an administrator from modifying their own account.
         if (targetUser.email === currentAdminEmail) {
           return res.status(403).json({
             success: false,
@@ -1565,7 +1463,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         });
       } catch (error) {
         console.error("Update user block status error:", error);
-
         return res.status(500).json({
           success: false,
           message: "Failed to update user status.",
@@ -1573,7 +1470,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
       }
     }
   );
-
 
   // Admin dashboard statistics API.
   router.get(
@@ -1584,11 +1480,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
       try {
         const db = getDB();
 
-        const usersCollection = db.collection("user");
-        const servicesCollection = db.collection("services");
-        const appointmentsCollection = db.collection("appointments");
-        const transactionsCollection = db.collection("transactions");
-
         const [
           totalServices,
           totalAppointments,
@@ -1596,11 +1487,11 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           totalTransactions,
           recentAppointments,
         ] = await Promise.all([
-          servicesCollection.countDocuments(),
-          appointmentsCollection.countDocuments(),
-          usersCollection.countDocuments({ role: "customer" }),
-          transactionsCollection.countDocuments(),
-          appointmentsCollection
+          db.collection("services").countDocuments(),
+          db.collection("appointments").countDocuments(),
+          db.collection("user").countDocuments({ role: "customer" }),
+          db.collection("transactions").countDocuments(),
+          db.collection("appointments")
             .find({})
             .sort({ createdAt: -1 })
             .limit(5)
@@ -1619,7 +1510,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         });
       } catch (error) {
         console.error("Admin statistics error:", error);
-
         return res.status(500).json({
           success: false,
           message: "Failed to fetch admin dashboard statistics.",
@@ -1641,32 +1531,80 @@ const createProtectedRoutes = (auth: AuthInstance) => {
     }
   );
 
+  // -------------------------------------------------------
+  // PROFILE MANAGEMENT
+  // -------------------------------------------------------
+
+  // Get the authenticated user's own profile.
+  router.get("/profile", requireAuth(auth), async (req, res) => {
+    try {
+      const session = res.locals.session;
+      const user = await getDB().collection("user").findOne(
+        { email: session.user.email },
+        {
+          projection: {
+            name: 1,
+            email: 1,
+            image: 1,
+            phone: 1,
+            role: 1,
+            isBlocked: 1,
+          },
+        }
+      );
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User profile was not found.",
+        });
+      }
+
+      return res.status(200).json({
+        success: true,
+        profile: {
+          name: user.name || "",
+          email: user.email,
+          image: user.image || "",
+          phone: user.phone || "",
+          role: user.role || "customer",
+        },
+      });
+    } catch (error) {
+      console.error("Get profile error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch profile.",
+      });
+    }
+  });
+
   // Update the authenticated user's own profile.
   router.patch("/profile", requireAuth(auth), async (req, res) => {
     try {
       const session = res.locals.session;
       const email = session.user.email;
 
+      // Only these three fields can be updated.
+      // Role and blocked status are deliberately excluded.
       const { name, phone, image } = req.body;
 
       const updates: {
         name?: string;
         phone?: string;
         image?: string;
+        updatedAt?: Date;
       } = {};
 
       if (name !== undefined) {
-        if (typeof name !== "string" || !name.trim()) {
+        if (
+          typeof name !== "string" ||
+          !name.trim() ||
+          name.trim().length > 100
+        ) {
           return res.status(400).json({
             success: false,
             message: "Please provide a valid name.",
-          });
-        }
-
-        if (name.trim().length > 100) {
-          return res.status(400).json({
-            success: false,
-            message: "Name cannot exceed 100 characters.",
           });
         }
 
@@ -1674,7 +1612,10 @@ const createProtectedRoutes = (auth: AuthInstance) => {
       }
 
       if (phone !== undefined) {
-        if (typeof phone !== "string" || phone.length > 20) {
+        if (
+          typeof phone !== "string" ||
+          phone.trim().length > 20
+        ) {
           return res.status(400).json({
             success: false,
             message: "Please provide a valid phone number.",
@@ -1692,20 +1633,23 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           });
         }
 
-        try {
-          const imageUrl = new URL(image);
+        // An empty string explicitly removes the profile photo.
+        if (image.trim() !== "") {
+          try {
+            const imageUrl = new URL(image.trim());
 
-          if (imageUrl.protocol !== "https:") {
-            throw new Error("Invalid image URL");
+            if (imageUrl.protocol !== "https:") {
+              throw new Error("Invalid image URL");
+            }
+          } catch {
+            return res.status(400).json({
+              success: false,
+              message: "Profile image must be a valid HTTPS image URL.",
+            });
           }
-        } catch {
-          return res.status(400).json({
-            success: false,
-            message: "Profile image must be a valid HTTPS URL.",
-          });
         }
 
-        updates.image = image;
+        updates.image = image.trim();
       }
 
       if (Object.keys(updates).length === 0) {
@@ -1714,6 +1658,8 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           message: "No profile information was provided.",
         });
       }
+
+      updates.updatedAt = new Date();
 
       const usersCollection = getDB().collection("user");
 
@@ -1729,18 +1675,34 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         });
       }
 
+      const updatedUser = await usersCollection.findOne(
+        { email },
+        {
+          projection: {
+            name: 1,
+            email: 1,
+            image: 1,
+            phone: 1,
+            role: 1,
+          },
+        }
+      );
+
       return res.status(200).json({
         success: true,
-        message: "Profile updated successfully.",
+        message: updates.image === ""
+          ? "Profile photo removed successfully."
+          : "Profile updated successfully.",
         profile: {
-          name: updates.name,
-          phone: updates.phone,
-          image: updates.image,
+          name: updatedUser?.name || "",
+          email: updatedUser?.email || "",
+          image: updatedUser?.image || "",
+          phone: updatedUser?.phone || "",
+          role: updatedUser?.role || "customer",
         },
       });
     } catch (error) {
       console.error("Profile update error:", error);
-
       return res.status(500).json({
         success: false,
         message: "Failed to update profile.",
