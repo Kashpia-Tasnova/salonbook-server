@@ -34,10 +34,19 @@ export const createAuth = () => {
       minPasswordLength: 6,
     },
 
+    // Allow users to link Google to an existing account
+    // when the email addresses match.
+    account: {
+      accountLinking: {
+        enabled: true,
+        trustedProviders: ["google"],
+        updateUserInfoOnLink: true,
+      },
+    },
+
     user: {
       additionalFields: {
         // Every newly registered user is automatically a customer.
-        // Public signup cannot choose or modify their role.
         role: {
           type: "string",
           required: false,
@@ -46,7 +55,6 @@ export const createAuth = () => {
         },
 
         // Blocking status is controlled only by administrators.
-        // Public signup cannot set or modify this field.
         isBlocked: {
           type: "boolean",
           required: false,
@@ -67,6 +75,10 @@ export const createAuth = () => {
       google: {
         clientId: googleClientId,
         clientSecret: googleClientSecret,
+
+        // Prevent Google sign-in from automatically creating new users.
+        // Explicit Google signup will use requestSignUp: true.
+        disableImplicitSignUp: true,
       },
     },
   });
