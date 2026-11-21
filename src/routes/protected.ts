@@ -1584,6 +1584,7 @@ const createProtectedRoutes = (auth: AuthInstance) => {
     try {
       const session = res.locals.session;
       const email = session.user.email;
+      const userId = session.user.id;
 
       // Only these three fields can be updated.
       // Role and blocked status are deliberately excluded.
@@ -1593,6 +1594,7 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         name?: string;
         phone?: string;
         image?: string;
+        googleImage?: string;
         updatedAt?: Date;
       } = {};
 
@@ -1625,6 +1627,30 @@ const createProtectedRoutes = (auth: AuthInstance) => {
         updates.phone = phone.trim();
       }
 
+      const usersCollection = getDB().collection("user");
+
+      // Get the current profile before changing the image.
+      const existingUser = await usersCollection.findOne(
+        { email },
+        {
+          projection: {
+            name: 1,
+            email: 1,
+            image: 1,
+            googleImage: 1,
+            phone: 1,
+            role: 1,
+          },
+        }
+      );
+
+      if (!existingUser) {
+        return res.status(404).json({
+          success: false,
+          message: "User profile was not found.",
+        });
+      }
+
       if (image !== undefined) {
         if (typeof image !== "string") {
           return res.status(400).json({
@@ -1633,10 +1659,28 @@ const createProtectedRoutes = (auth: AuthInstance) => {
           });
         }
 
-        // An empty string explicitly removes the profile photo.
-        if (image.trim() !== "") {
+        const trimmedImage = image.trim();
+
+        // Check whether this user has a linked Google account.
+        const accountUserIds: (string | ObjectId)[] = [userId];
+
+        if (ObjectId.isValid(userId)) {
+          accountUserIds.push(new ObjectId(userId));
+        }
+
+        const googleAccount = await getDB()
+          .collection("account")
+          .findOne({
+            providerId: "google",
+            userId: { $in: accountUserIds },
+          });
+
+        const isGoogleUser = Boolean(googleAccount);
+
+        if (trimmedImage !== "") {
+          // Validate the uploaded profile image URL.
           try {
-            const imageUrl = new URL(image.trim());
+            const imageUrl = new URL(trimmedImage);
 
             if (imageUrl.protocol !== "https:") {
               throw new Error("Invalid image URL");
@@ -1647,9 +1691,28 @@ const createProtectedRoutes = (auth: AuthInstance) => {
               message: "Profile image must be a valid HTTPS image URL.",
             });
           }
-        }
 
-        updates.image = image.trim();
+          // Preserve the original Google photo before replacing it.
+          if (
+            isGoogleUser &&
+            !existingUser.googleImage &&
+            existingUser.image
+          ) {
+            updates.googleImage = existingUser.image;
+          }
+
+          // Save the custom profile photo.
+          updates.image = trimmedImage;
+        } else {
+          // The user requested to remove their custom profile photo.
+          if (isGoogleUser) {
+            // Restore the original Google profile photo.
+            updates.image = existingUser.googleImage || "";
+          } else {
+            // Email/password users return to their initial avatar.
+            updates.image = "";
+          }
+        }
       }
 
       if (Object.keys(updates).length === 0) {
@@ -1660,8 +1723,6 @@ const createProtectedRoutes = (auth: AuthInstance) => {
       }
 
       updates.updatedAt = new Date();
-
-      const usersCollection = getDB().collection("user");
 
       const result = await usersCollection.updateOne(
         { email },
@@ -1690,9 +1751,10 @@ const createProtectedRoutes = (auth: AuthInstance) => {
 
       return res.status(200).json({
         success: true,
-        message: updates.image === ""
-          ? "Profile photo removed successfully."
-          : "Profile updated successfully.",
+        message:
+          image === ""
+            ? "Profile photo removed successfully."
+            : "Profile updated successfully.",
         profile: {
           name: updatedUser?.name || "",
           email: updatedUser?.email || "",
@@ -1703,6 +1765,7 @@ const createProtectedRoutes = (auth: AuthInstance) => {
       });
     } catch (error) {
       console.error("Profile update error:", error);
+
       return res.status(500).json({
         success: false,
         message: "Failed to update profile.",
