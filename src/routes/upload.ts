@@ -53,14 +53,22 @@ const uploadImage = async (
       });
     }
 
-    const base64Image = req.file.buffer.toString("base64");
+    // Use multipart FormData, just like StudioSpace.
+    const formData = new FormData();
 
-    const formData = new URLSearchParams();
-    formData.append("key", apiKey);
-    formData.append("image", base64Image);
+    const imageBlob = new Blob(
+      [new Uint8Array(req.file.buffer)],
+      { type: req.file.mimetype }
+    );
+
+    formData.append(
+      "image",
+      imageBlob,
+      req.file.originalname
+    );
 
     const response = await fetch(
-      "https://api.imgbb.com/1/upload",
+      `https://api.imgbb.com/1/upload?key=${encodeURIComponent(apiKey)}`,
       {
         method: "POST",
         body: formData,
