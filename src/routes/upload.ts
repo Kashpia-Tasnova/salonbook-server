@@ -1,12 +1,20 @@
 
 import { Router } from "express";
 import multer from "multer";
+import { v2 as cloudinary } from "cloudinary";
 import { requireAuth, requireRole } from "../middleware/authMiddleware.js";
 import type { createAuth } from "../lib/auth.js";
 
 type AuthInstance = ReturnType<typeof createAuth>;
 
 type ImageType = "profile" | "category" | "service";
+
+// Configure Cloudinary using Render environment variables.
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -31,6 +39,34 @@ const upload = multer({
   },
 });
 
+// Upload an image buffer to Cloudinary.
+const uploadToCloudinary = (
+  buffer: Buffer,
+  folder: string
+): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const stream = cloudinary.uploader.upload_stream(
+      {
+        folder: `salonbook/${folder}`,
+        resource_type: "image",
+      },
+      (error, result) => {
+        if (error) {
+          return reject(error);
+        }
+
+        if (!result?.secure_url) {
+          return reject(new Error("Cloudinary did not return an image URL."));
+        }
+
+        resolve(result.secure_url);
+      }
+    );
+
+    stream.end(buffer);
+  });
+};
+
 const uploadImage = async (
   req: import("express").Request,
   res: import("express").Response,
@@ -44,47 +80,21 @@ const uploadImage = async (
       });
     }
 
-    const apiKey = process.env.IMGBB_API_KEY;
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    const apiKey = process.env.CLOUDINARY_API_KEY;
+    const apiSecret = process.env.CLOUDINARY_API_SECRET;
 
-    if (!apiKey) {
+    if (!cloudName || !apiKey || !apiSecret) {
       return res.status(500).json({
         success: false,
         message: "Image upload configuration is missing.",
       });
     }
 
-    // Use multipart FormData, just like StudioSpace.
-    const formData = new FormData();
-
-    const imageBlob = new Blob(
-      [new Uint8Array(req.file.buffer)],
-      { type: req.file.mimetype }
+    const imageUrl = await uploadToCloudinary(
+      req.file.buffer,
+      imageType
     );
-
-    formData.append(
-      "image",
-      imageBlob,
-      req.file.originalname
-    );
-
-    const response = await fetch(
-      `https://api.imgbb.com/1/upload?key=${encodeURIComponent(apiKey)}`,
-      {
-        method: "POST",
-        body: formData,
-      }
-    );
-
-    const result = await response.json();
-
-    if (!response.ok || !result.success) {
-      console.error("ImgBB upload failed:", result);
-
-      return res.status(502).json({
-        success: false,
-        message: "Failed to upload image. Please try another image.",
-      });
-    }
 
     const imageTypeLabel =
       imageType === "category"
@@ -96,14 +106,14 @@ const uploadImage = async (
     return res.status(200).json({
       success: true,
       message: `${imageTypeLabel} image uploaded successfully.`,
-      imageUrl: result.data.url,
+      imageUrl,
     });
   } catch (error) {
-    console.error("Image upload error:", error);
+    console.error("Cloudinary upload failed:", error);
 
-    return res.status(500).json({
+    return res.status(502).json({
       success: false,
-      message: "Something went wrong while uploading the image.",
+      message: "Failed to upload image. Please try another image.",
     });
   }
 };
